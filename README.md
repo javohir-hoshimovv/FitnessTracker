@@ -9,5 +9,8 @@ You can
    * Delete
    * View
    * Categorize
+   * Graph
 
-you workouts
+your workouts.
+
+
