@@ -1,0 +1,255 @@
+import javax.swing.*;
+import java.awt.*;
+import java.awt.event.ActionEvent;
+import java.awt.event.ActionListener;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.stream.Collectors;
+
+public class FitnessTrackerApp {
+    private static final Map<String, Integer> workouts = new HashMap<>();
+    private static final Map<String, String> categories = new HashMap<>();
+    private static JPanel chartPanel;
+    private static JTextArea workoutTextArea;
+    private static JComboBox<String> categoryComboBox;
+
+    public static void main(String[] args) {
+        JFrame frame = new JFrame("Fitness Tracker");
+        frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+        frame.setSize(800, 600);
+        frame.setLayout(new BorderLayout());
+
+        JPanel workoutPanel = createWorkoutPanel();
+        chartPanel = createChartPanel();
+
+        frame.add(workoutPanel, BorderLayout.WEST);
+        frame.add(chartPanel, BorderLayout.CENTER);
+
+        frame.setVisible(true);
+    }
+
+    private static JPanel createWorkoutPanel() {
+        JPanel workoutPanel = new JPanel(new BorderLayout());
+        workoutTextArea = new JTextArea(20, 20);
+        workoutTextArea.setEditable(false);
+        JScrollPane scrollPane = new JScrollPane(workoutTextArea);
+
+        JPanel buttonPanel = new JPanel(new GridLayout(3, 1, 5, 5));
+
+        JButton addWorkoutButton = new JButton("Add Workout");
+        addWorkoutButton.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                String exercise = JOptionPane.showInputDialog("Enter exercise name:");
+                if (exercise == null || exercise.trim().isEmpty()) {
+                    return;
+                }
+                String durationStr = JOptionPane.showInputDialog("Enter duration in minutes:");
+                if (durationStr == null || durationStr.trim().isEmpty()) {
+                    return;
+                }
+                try {
+                    int duration = Integer.parseInt(durationStr);
+                    String category = (String) categoryComboBox.getSelectedItem();
+                    workouts.put(exercise, duration);
+                    categories.put(exercise, category);
+                    updateWorkoutTextArea();
+                    updateChart();
+                } catch (NumberFormatException ex) {
+                    JOptionPane.showMessageDialog(null, "Please enter a valid number for duration.");
+                }
+            }
+        });
+
+        JButton viewWorkoutsButton = new JButton("View Workouts List");
+        viewWorkoutsButton.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                StringBuilder sb = new StringBuilder();
+                for (Map.Entry<String, Integer> entry : workouts.entrySet()) {
+                    sb.append(entry.getKey()).append(": ").append(entry.getValue()).append(" minutes\n");
+                }
+                JOptionPane.showMessageDialog(null, sb.toString(), "Today's Workouts", JOptionPane.PLAIN_MESSAGE);
+            }
+        });
+
+        JButton totalTimeButton = new JButton("View Workout Time");
+        totalTimeButton.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                int total = workouts.values().stream().mapToInt(Integer::intValue).sum();
+                JOptionPane.showMessageDialog(null, "Total workout time: " + total + " minutes", "Total Workout Time", JOptionPane.PLAIN_MESSAGE);
+            }
+        });
+
+        buttonPanel.add(addWorkoutButton);
+        buttonPanel.add(viewWorkoutsButton);
+        buttonPanel.add(totalTimeButton);
+
+        JButton editWorkoutButton = new JButton("Edit Workout");
+        editWorkoutButton.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                String selectedWorkout = getSelectedWorkout();
+                if (selectedWorkout != null) {
+                    String newDurationStr = JOptionPane.showInputDialog("Enter new duration for " + selectedWorkout + ":");
+                    if (newDurationStr != null && !newDurationStr.trim().isEmpty()) {
+                        try {
+                            int newDuration = Integer.parseInt(newDurationStr);
+                            workouts.put(selectedWorkout, newDuration);
+                            updateWorkoutTextArea();
+                            updateChart();
+                        } catch (NumberFormatException ex) {
+                            JOptionPane.showMessageDialog(null, "Please enter a valid number for duration.");
+                        }
+                    }
+                } else {
+                    JOptionPane.showMessageDialog(null, "Please select a workout to edit.");
+                }
+            }
+        });
+
+        JButton deleteWorkoutButton = new JButton("Delete Workout");
+        deleteWorkoutButton.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                String selectedWorkout = getSelectedWorkout();
+                if (selectedWorkout != null) {
+                    int confirm = JOptionPane.showConfirmDialog(null, "Are you sure you want to delete " + selectedWorkout + "?", "Confirm Delete", JOptionPane.YES_NO_OPTION);
+                    if (confirm == JOptionPane.YES_OPTION) {
+                        workouts.remove(selectedWorkout);
+                        categories.remove(selectedWorkout);
+                        updateWorkoutTextArea();
+                        updateChart();
+                    }
+                } else {
+                    JOptionPane.showMessageDialog(null, "Please select a workout to delete.");
+                }
+            }
+        });
+
+        buttonPanel.add(addWorkoutButton);
+        buttonPanel.add(editWorkoutButton);
+        buttonPanel.add(deleteWorkoutButton);
+
+        JPanel categoryPanel = createCategoryPanel();
+
+        workoutPanel.add(scrollPane, BorderLayout.CENTER);
+        workoutPanel.add(buttonPanel, BorderLayout.SOUTH);
+        workoutPanel.add(categoryPanel, BorderLayout.NORTH);
+
+        return workoutPanel;
+    }
+
+    private static JPanel createCategoryPanel() {
+        JPanel categoryPanel = new JPanel();
+        JLabel categoryLabel = new JLabel("Category:");
+        categoryComboBox = new JComboBox<>(new String[]{"All", "Cardio", "Strength Training", "Flexibility", "Others"});
+        categoryComboBox.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                updateWorkoutTextArea();
+            }
+        });
+        categoryPanel.add(categoryLabel);
+        categoryPanel.add(categoryComboBox);
+        return categoryPanel;
+    }
+
+    private static JPanel createChartPanel() {
+        JPanel panel = new JPanel() {
+            @Override
+            protected void paintComponent(Graphics g) {
+                super.paintComponent(g);
+                drawChart(g);
+            }
+
+            @Override
+            public Dimension getPreferredSize() {
+                return new Dimension(400, 400);
+            }
+        };
+        return panel;
+    }
+
+    private static void drawChart(Graphics g) {
+        Graphics2D g2d = (Graphics2D) g;
+        g2d.setColor(Color.WHITE);
+        g2d.fillRect(0, 0, chartPanel.getWidth(), chartPanel.getHeight());
+
+        int barWidth = 40;
+        int x = 50;
+        int y = 50;
+        int maxHeight = chartPanel.getHeight() - 100;
+
+        Map<String, Integer> filteredWorkouts = workouts;
+        if (!"All".equals(categoryComboBox.getSelectedItem())) {
+            String selectedCategory = (String) categoryComboBox.getSelectedItem();
+            filteredWorkouts = workouts.entrySet().stream()
+                    .filter(entry -> selectedCategory.equals(categories.get(entry.getKey())))
+                    .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
+        }
+
+        g2d.setColor(Color.BLACK);
+        for (Map.Entry<String, Integer> entry : filteredWorkouts.entrySet()) {
+            int height = (int) ((double) entry.getValue() / getMaxWorkoutDuration(filteredWorkouts) * maxHeight);
+            g2d.fillRect(x, chartPanel.getHeight() - y - height, barWidth, height);
+            g2d.drawString(entry.getKey(), x, chartPanel.getHeight() - y + 20);
+            x += 2 * barWidth;
+        }
+    }
+
+    private static int getMaxWorkoutDuration(Map<String, Integer> filteredWorkouts) {
+        return filteredWorkouts.values().stream().mapToInt(Integer::intValue).max().orElse(0);
+    }
+
+    private static void updateChart() {
+        chartPanel.repaint();
+    }
+
+    private static void updateWorkoutTextArea() {
+        StringBuilder sb = new StringBuilder();
+        String selectedCategory = (String) categoryComboBox.getSelectedItem();
+        if ("All".equals(selectedCategory)) {
+            for (Map.Entry<String, Integer> entry : workouts.entrySet()) {
+                sb.append(entry.getKey()).append(": ").append(entry.getValue()).append(" minutes\n");
+            }
+        } else {
+            for (Map.Entry<String, Integer> entry : workouts.entrySet()) {
+                if (selectedCategory.equals(categories.get(entry.getKey()))) {
+                    sb.append(entry.getKey()).append(": ").append(entry.getValue()).append(" minutes\n");
+                }
+            }
+        }
+        workoutTextArea.setText(sb.toString());
+    }
+
+    private static String getSelectedWorkout() {
+        String[] options = workouts.keySet().toArray(new String[0]);
+        if (options.length == 0) {
+            return null;
+        }
+        return (String) JOptionPane.showInputDialog(null, "Select workout to edit/delete:", "Workout Selection", JOptionPane.QUESTION_MESSAGE, null, options, options[0]);
+    }
+
+    private static JPanel createImagePanel() {
+        JPanel panel = new JPanel() {
+            @Override
+            protected void paintComponent(Graphics g) {
+                super.paintComponent(g);
+                // Load the image
+                ImageIcon imageIcon = new ImageIcon("https://images.app.goo.gl/JDrkgjXwHzitfYh36.jpg");
+                // Draw the image
+                g.drawImage(imageIcon.getImage(), 0, 0, getWidth(), getHeight(), null);
+            }
+
+            @Override
+            public Dimension getPreferredSize() {
+                // Set the preferred size based on the image dimensions
+                ImageIcon imageIcon = new ImageIcon("path_to_your_image_file.jpg");
+                return new Dimension(imageIcon.getIconWidth(), imageIcon.getIconHeight());
+            }
+        };
+        return panel;
+    }
+}
